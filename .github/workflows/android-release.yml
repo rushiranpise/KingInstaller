@@ -1,0 +1,138 @@
+name: Android CI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APKs
+    runs-on: ubuntu-latest
+
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-36"
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          version_name=$(awk -F'"' '/versionName/ { print $2; exit }' app/build.gradle)
+          version_code=$(awk '/versionCode/ { print $2; exit }' app/build.gradle)
+
+          if [ -z "$version_name" ] || [ -z "$version_code" ]; then
+            echo "Could not read versionName/versionCode from app/build.gradle" >&2
+            exit 1
+          fi
+
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "release_tag=v$version_name" >> "$GITHUB_OUTPUT"
+
+      - name: Build debug and release APKs
+        run: ./gradlew --no-daemon clean :app:assembleDebug :app:assembleRelease
+
+      - name: Prepare APK artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "artifacts/KingInstaller-${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}-debug.apk"
+          cp app/build/outputs/apk/release/app-release.apk \
+            "artifacts/KingInstaller-${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}-release.apk"
+          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KingInstaller-${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}-apks
+          path: artifacts/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: KingInstaller-${{ needs.build.outputs.version_name }}-${{ needs.build.outputs.version_code }}-apks
+          path: artifacts
+
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="${{ needs.build.outputs.release_tag }}"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git fetch --tags
+            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              git tag "$tag"
+              git push origin "$tag"
+            fi
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release_tag.outputs.tag }}
+          VERSION_NAME: ${{ needs.build.outputs.version_name }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            gh release create "$TAG" artifacts/* \
+              --title "KingInstaller $VERSION_NAME" \
+              --generate-notes
+          fi

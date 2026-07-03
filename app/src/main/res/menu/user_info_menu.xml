@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+       android:id="@+id/action_theme"
+       android:icon="@drawable/ic_contrast_24"
+       android:iconTint="?attr/colorOnSurface"
+       android:title="@string/theme_auto"
+       app:showAsAction="ifRoom" />
     <item
        android:id="@+id/action_search"
-       android:title="@string/source_code_annexhack"/>
+       android:title="@string/source_code_annexhack"
+       app:showAsAction="never" />
     <item
         android:id="@+id/action_search2"
-        android:title="@string/source_code_fcaronte"/>
+        android:title="@string/source_code_fcaronte"
+        app:showAsAction="never" />
     <item
         android:id="@+id/action_search3"
-        android:title="@string/source_code_rikj000"/>
+        android:title="@string/source_code_rikj000"
+        app:showAsAction="never" />
 </menu>
