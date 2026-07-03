@@ -7,6 +7,7 @@
         tools:ignore="QueryAllPackagesPermission" />
 
     <queries>
+        <package android:name="moe.shizuku.privileged.api" />
         <package android:name="com.topjohnwu.magisk" />
         <package android:name="io.github.huskydg.magisk" />
         <package android:name="me.weishu.kernelsu" />
@@ -51,8 +52,11 @@
             android:exported="true"
             android:noHistory="true"
             android:excludeFromRecents="true">
-            <intent-filter tools:ignore="AppLinkUrlError">
+            <intent-filter
+                android:priority="10"
+                tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.INSTALL_PACKAGE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data
                     android:scheme="content"
@@ -79,7 +83,7 @@
                     android:scheme="file"
                     android:mimeType="application/x-zip-compressed" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter android:priority="10">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.android.package-archive" />

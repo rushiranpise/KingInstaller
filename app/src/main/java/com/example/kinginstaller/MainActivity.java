@@ -69,10 +69,19 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREF_INSTALLER_PACKAGE = "installer_package";
     private static final String PREF_INSTALL_REASON = "install_reason";
     private static final String PREF_PACKAGE_SOURCE = "package_source";
+    private static final String PREF_TARGET_USER_ID = "target_user_id";
     private static final String PREF_ALLOW_TEST_ONLY = "allow_test_only";
     private static final String PREF_BYPASS_LOW_TARGET = "bypass_low_target";
     private static final String PREF_GRANT_ALL_PERMISSIONS = "grant_all_permissions";
     private static final String PREF_REQUEST_UPDATE_OWNERSHIP = "request_update_ownership";
+    private static final String PREF_INSTALL_FOR_ALL_USERS = "install_for_all_users";
+    private static final String PREF_ALLOW_DOWNGRADE = "allow_downgrade";
+    private static final String PREF_ALLOW_RESTRICTED_PERMISSIONS = "allow_restricted_permissions";
+    private static final String PREF_DISABLE_VERIFICATION = "disable_verification";
+    private static final String PREF_ENABLE_ROLLBACK = "enable_rollback";
+    private static final String PREF_FROM_ADB = "from_adb";
+    private static final String PREF_BYPASS_PLAY_PROTECT = "bypass_play_protect";
+    private static final String PREF_PRIVATE_SPACE_INSTALL = "private_space_install";
     private static final String STATE_SELECTED_URI = "selected_uri";
     private static final long ROOT_COMMAND_TIMEOUT_MS = 1500;
     private static final int PACKAGE_VISIBILITY_CHECK_ATTEMPTS = 8;
@@ -143,12 +152,21 @@ public class MainActivity extends AppCompatActivity {
     private TextView apkInfoText;
     private TextView deviceInfoText;
     private EditText installerSourceEdit;
+    private EditText targetUserEdit;
     private MaterialAutoCompleteTextView installReasonDropdown;
     private MaterialAutoCompleteTextView packageSourceDropdown;
     private MaterialCheckBox allowTestOnlyCheck;
     private MaterialCheckBox bypassLowTargetCheck;
     private MaterialCheckBox grantAllPermissionsCheck;
     private MaterialCheckBox requestUpdateOwnershipCheck;
+    private MaterialCheckBox installForAllUsersCheck;
+    private MaterialCheckBox allowDowngradeCheck;
+    private MaterialCheckBox allowRestrictedPermissionsCheck;
+    private MaterialCheckBox disableVerificationCheck;
+    private MaterialCheckBox enableRollbackCheck;
+    private MaterialCheckBox fromAdbCheck;
+    private MaterialCheckBox bypassPlayProtectCheck;
+    private MaterialCheckBox privateSpaceInstallCheck;
     private RadioGroup methodGroup;
     private RadioGroup authorizerGroup;
     private MaterialRadioButton methodNormalMode;
@@ -283,12 +301,21 @@ public class MainActivity extends AppCompatActivity {
         apkInfoText = findViewById(R.id.textViewApkInfo);
         deviceInfoText = findViewById(R.id.deviceInfoText);
         installerSourceEdit = findViewById(R.id.installerSourceEdit);
+        targetUserEdit = findViewById(R.id.targetUserEdit);
         installReasonDropdown = findViewById(R.id.installReasonDropdown);
         packageSourceDropdown = findViewById(R.id.packageSourceDropdown);
         allowTestOnlyCheck = findViewById(R.id.allowTestOnlyCheck);
         bypassLowTargetCheck = findViewById(R.id.bypassLowTargetCheck);
         grantAllPermissionsCheck = findViewById(R.id.grantAllPermissionsCheck);
         requestUpdateOwnershipCheck = findViewById(R.id.requestUpdateOwnershipCheck);
+        installForAllUsersCheck = findViewById(R.id.installForAllUsersCheck);
+        allowDowngradeCheck = findViewById(R.id.allowDowngradeCheck);
+        allowRestrictedPermissionsCheck = findViewById(R.id.allowRestrictedPermissionsCheck);
+        disableVerificationCheck = findViewById(R.id.disableVerificationCheck);
+        enableRollbackCheck = findViewById(R.id.enableRollbackCheck);
+        fromAdbCheck = findViewById(R.id.fromAdbCheck);
+        bypassPlayProtectCheck = findViewById(R.id.bypassPlayProtectCheck);
+        privateSpaceInstallCheck = findViewById(R.id.privateSpaceInstallCheck);
         methodGroup = findViewById(R.id.methodGroup);
         authorizerGroup = findViewById(R.id.authorizerGroup);
         methodNormalMode = findViewById(R.id.radioMethodNormal);
@@ -331,6 +358,7 @@ public class MainActivity extends AppCompatActivity {
         ));
 
         installerSourceEdit.setText(prefs.getString(PREF_INSTALLER_PACKAGE, PLAY_STORE_PACKAGE));
+        targetUserEdit.setText(String.valueOf(prefs.getInt(PREF_TARGET_USER_ID, 0)));
         setDropdownSelection(
                 installReasonDropdown,
                 reasonLabels,
@@ -345,8 +373,19 @@ public class MainActivity extends AppCompatActivity {
         bypassLowTargetCheck.setChecked(prefs.getBoolean(PREF_BYPASS_LOW_TARGET, false));
         grantAllPermissionsCheck.setChecked(prefs.getBoolean(PREF_GRANT_ALL_PERMISSIONS, false));
         requestUpdateOwnershipCheck.setChecked(prefs.getBoolean(PREF_REQUEST_UPDATE_OWNERSHIP, false));
+        installForAllUsersCheck.setChecked(prefs.getBoolean(PREF_INSTALL_FOR_ALL_USERS, false));
+        allowDowngradeCheck.setChecked(prefs.getBoolean(PREF_ALLOW_DOWNGRADE, false));
+        allowRestrictedPermissionsCheck.setChecked(prefs.getBoolean(PREF_ALLOW_RESTRICTED_PERMISSIONS, false));
+        disableVerificationCheck.setChecked(prefs.getBoolean(PREF_DISABLE_VERIFICATION, false));
+        enableRollbackCheck.setChecked(prefs.getBoolean(PREF_ENABLE_ROLLBACK, false));
+        fromAdbCheck.setChecked(prefs.getBoolean(PREF_FROM_ADB, false));
+        bypassPlayProtectCheck.setChecked(prefs.getBoolean(PREF_BYPASS_PLAY_PROTECT, false));
+        privateSpaceInstallCheck.setChecked(prefs.getBoolean(PREF_PRIVATE_SPACE_INSTALL, false));
 
         installerSourceEdit.setOnFocusChangeListener((view, hasFocus) -> {
+            if (!hasFocus) saveAdvancedSettings();
+        });
+        targetUserEdit.setOnFocusChangeListener((view, hasFocus) -> {
             if (!hasFocus) saveAdvancedSettings();
         });
         installReasonDropdown.setOnItemClickListener((parent, view, position, id) -> saveAdvancedSettings());
@@ -355,6 +394,15 @@ public class MainActivity extends AppCompatActivity {
         bypassLowTargetCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
         grantAllPermissionsCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
         requestUpdateOwnershipCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        installForAllUsersCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        allowDowngradeCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        allowRestrictedPermissionsCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        disableVerificationCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        enableRollbackCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        fromAdbCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        bypassPlayProtectCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        privateSpaceInstallCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        updateAdvancedControlState();
     }
 
     private String[] installReasonLabels() {
@@ -363,7 +411,8 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.install_reason_policy),
                 getString(R.string.install_reason_restore),
                 getString(R.string.install_reason_setup),
-                getString(R.string.install_reason_user)
+                getString(R.string.install_reason_user),
+                getString(R.string.install_reason_rollback)
         };
     }
 
@@ -395,10 +444,19 @@ public class MainActivity extends AppCompatActivity {
                 .putString(PREF_INSTALLER_PACKAGE, getConfiguredInstallerPackageName())
                 .putInt(PREF_INSTALL_REASON, selectedInstallReason())
                 .putInt(PREF_PACKAGE_SOURCE, selectedPackageSource())
+                .putInt(PREF_TARGET_USER_ID, selectedTargetUserId())
                 .putBoolean(PREF_ALLOW_TEST_ONLY, allowTestOnlyCheck.isChecked())
                 .putBoolean(PREF_BYPASS_LOW_TARGET, bypassLowTargetCheck.isChecked())
                 .putBoolean(PREF_GRANT_ALL_PERMISSIONS, grantAllPermissionsCheck.isChecked())
                 .putBoolean(PREF_REQUEST_UPDATE_OWNERSHIP, requestUpdateOwnershipCheck.isChecked())
+                .putBoolean(PREF_INSTALL_FOR_ALL_USERS, installForAllUsersCheck.isChecked())
+                .putBoolean(PREF_ALLOW_DOWNGRADE, allowDowngradeCheck.isChecked())
+                .putBoolean(PREF_ALLOW_RESTRICTED_PERMISSIONS, allowRestrictedPermissionsCheck.isChecked())
+                .putBoolean(PREF_DISABLE_VERIFICATION, disableVerificationCheck.isChecked())
+                .putBoolean(PREF_ENABLE_ROLLBACK, enableRollbackCheck.isChecked())
+                .putBoolean(PREF_FROM_ADB, fromAdbCheck.isChecked())
+                .putBoolean(PREF_BYPASS_PLAY_PROTECT, bypassPlayProtectCheck.isChecked())
+                .putBoolean(PREF_PRIVATE_SPACE_INSTALL, privateSpaceInstallCheck.isChecked())
                 .apply();
     }
 
@@ -408,10 +466,19 @@ public class MainActivity extends AppCompatActivity {
                 getConfiguredInstallerPackageName(),
                 selectedInstallReason(),
                 selectedPackageSource(),
+                selectedTargetUserId(),
                 allowTestOnlyCheck.isChecked(),
                 bypassLowTargetCheck.isChecked(),
                 grantAllPermissionsCheck.isChecked(),
-                requestUpdateOwnershipCheck.isChecked()
+                requestUpdateOwnershipCheck.isChecked(),
+                installForAllUsersCheck.isChecked(),
+                allowDowngradeCheck.isChecked(),
+                allowRestrictedPermissionsCheck.isChecked(),
+                disableVerificationCheck.isChecked(),
+                enableRollbackCheck.isChecked(),
+                fromAdbCheck.isChecked(),
+                bypassPlayProtectCheck.isChecked(),
+                privateSpaceInstallCheck.isChecked()
         );
     }
 
@@ -428,6 +495,16 @@ public class MainActivity extends AppCompatActivity {
 
     private int selectedPackageSource() {
         return selectedDropdownIndex(packageSourceDropdown, packageSourceLabels(), DEFAULT_PACKAGE_SOURCE);
+    }
+
+    private int selectedTargetUserId() {
+        String value = targetUserEdit.getText() == null ? "" : targetUserEdit.getText().toString().trim();
+        if (value.isEmpty()) return 0;
+        try {
+            return Math.max(0, Integer.parseInt(value));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private void bindControls() {
@@ -519,9 +596,33 @@ public class MainActivity extends AppCompatActivity {
         authorizerRootMode.setChecked(isRootRoute(selectedInstallRoute));
         updatingMode = false;
         updateOemAliasState();
+        updateAdvancedControlState();
         saveModeState();
         updateInstallButtonLabel();
         Log.d(TAG, "install route=" + selectedInstallRoute);
+    }
+
+    private void updateAdvancedControlState() {
+        boolean privileged = !isNoRootRoute(selectedInstallRoute);
+        setPrivilegedAdvancedEnabled(targetUserEdit, privileged);
+        setPrivilegedAdvancedEnabled(allowTestOnlyCheck, privileged);
+        setPrivilegedAdvancedEnabled(bypassLowTargetCheck, privileged);
+        setPrivilegedAdvancedEnabled(grantAllPermissionsCheck, privileged);
+        setPrivilegedAdvancedEnabled(requestUpdateOwnershipCheck, privileged);
+        setPrivilegedAdvancedEnabled(installForAllUsersCheck, privileged);
+        setPrivilegedAdvancedEnabled(allowDowngradeCheck, privileged);
+        setPrivilegedAdvancedEnabled(allowRestrictedPermissionsCheck, privileged);
+        setPrivilegedAdvancedEnabled(disableVerificationCheck, privileged);
+        setPrivilegedAdvancedEnabled(enableRollbackCheck, privileged);
+        setPrivilegedAdvancedEnabled(fromAdbCheck, privileged);
+        setPrivilegedAdvancedEnabled(bypassPlayProtectCheck, privileged);
+        setPrivilegedAdvancedEnabled(privateSpaceInstallCheck, privileged);
+    }
+
+    private void setPrivilegedAdvancedEnabled(View view, boolean enabled) {
+        if (view == null) return;
+        view.setEnabled(enabled);
+        view.setAlpha(enabled ? 1f : 0.45f);
     }
 
     private void updateInstallButtonLabel() {
@@ -599,6 +700,10 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isOemRouteSelected() {
         return isOemRoute(selectedInstallRoute);
+    }
+
+    private boolean isNoRootRouteSelected() {
+        return isNoRootRoute(selectedInstallRoute);
     }
 
     private void updateDeviceInfoStatus() {
@@ -770,6 +875,9 @@ public class MainActivity extends AppCompatActivity {
 
     private String buildRootInstallCommand(InstallOptions options) {
         StringBuilder command = new StringBuilder();
+        if (options.bypassPlayProtect) {
+            command.append("settings put global verifier_verify_adb_installs 0 2>&1 || true; ");
+        }
         if (selectedApkSet.isSingleApk()) {
             command.append("pm install");
             appendRootInstallOptions(command, options);
@@ -789,12 +897,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void appendRootInstallOptions(StringBuilder command, InstallOptions options) {
+        if (options.installForAllUsers) {
+            command.append(" --user all");
+        } else {
+            command.append(" --user ").append(options.targetUserId);
+        }
         if (options.allowTestOnly) {
             command.append(" -t");
         }
         command.append(" -i ").append(shellQuote(options.installerPackageName));
+        if (options.allowDowngrade) {
+            command.append(" -d");
+        }
         if (options.grantAllPermissions) {
             command.append(" -g");
+        }
+        if (!options.allowRestrictedPermissions && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            command.append(" --restrict-permissions");
+        }
+        if ((options.disableVerification || options.bypassPlayProtect) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            command.append(" --skip-verification");
+        }
+        if (options.enableRollback && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            command.append(" --enable-rollback");
         }
         if (options.bypassLowTargetSdk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             command.append(" --bypass-low-target-sdk-block");
@@ -842,7 +967,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void installAsKing() {
-        InstallOptions options = createInstallOptions();
+        InstallOptions options = createInstallOptions().withoutPrivilegedOptions();
         if (!selectedApkSet.isSingleApk()) {
             installSplitSessionWithUserAction(options);
             return;
@@ -1024,7 +1149,8 @@ public class MainActivity extends AppCompatActivity {
             if (extra instanceof Uri) {
                 uri = (Uri) extra;
             }
-        } else if (Intent.ACTION_VIEW.equals(intent.getAction())) {
+        } else if (Intent.ACTION_VIEW.equals(intent.getAction())
+                || Intent.ACTION_INSTALL_PACKAGE.equals(intent.getAction())) {
             uri = intent.getData();
         } else if (Intent.ACTION_SEND.equals(intent.getAction())) {
             Object stream = intent.getParcelableExtra(Intent.EXTRA_STREAM);

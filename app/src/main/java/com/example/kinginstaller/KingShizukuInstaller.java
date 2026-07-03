@@ -12,7 +12,6 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Process;
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -28,7 +27,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
-import rikka.shizuku.Shizuku;
 import rikka.shizuku.ShizukuBinderWrapper;
 import rikka.shizuku.ShizukuProvider;
 import rikka.shizuku.SystemServiceHelper;
@@ -41,9 +39,17 @@ class KingShizukuInstaller {
     private static final String PLAY_STORE_PACKAGE = "com.android.vending";
     private static final int INSTALL_REPLACE_EXISTING = 0x00000002;
     private static final int INSTALL_ALLOW_TEST = 0x00000004;
+    private static final int INSTALL_FROM_ADB = 0x00000020;
+    private static final int INSTALL_ALL_USERS = 0x00000040;
+    private static final int INSTALL_REQUEST_DOWNGRADE = 0x00000080;
     private static final int INSTALL_GRANT_ALL_REQUESTED_PERMISSIONS = 0x00000100;
+    private static final int INSTALL_ENABLE_ROLLBACK = 0x00040000;
+    private static final int INSTALL_DISABLE_VERIFICATION = 0x00080000;
+    private static final int INSTALL_ALLOW_DOWNGRADE = 0x00100000;
+    private static final int INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS = 0x00400000;
     private static final int INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK = 0x01000000;
     private static final int INSTALL_REQUEST_UPDATE_OWNERSHIP = 1 << 25;
+    private static final int INSTALL_FROM_MANAGED_USER_OR_PROFILE = 1 << 26;
 
     private final Application app;
 
@@ -85,15 +91,13 @@ class KingShizukuInstaller {
         }
         IPackageManager packageManager = obtainPackageManager();
         IPackageInstaller packageInstaller = obtainPackageInstaller(packageManager);
-        boolean isRoot = getShizukuUid() == 0;
-        int userId = isRoot ? Process.myUid() / 100000 : 0;
         String attributionTag = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? app.getAttributionTag() : null;
 
         PackageInstaller wrappedInstaller = createPackageInstaller(
                 packageInstaller,
                 options.installerPackageName,
                 attributionTag,
-                userId
+                options.targetUserId
         );
 
         PackageInstaller.SessionParams params =
@@ -157,7 +161,16 @@ class KingShizukuInstaller {
                 PLAY_STORE_PACKAGE,
                 PackageManager.INSTALL_REASON_USER,
                 PackageInstaller.PACKAGE_SOURCE_STORE,
+                0,
                 true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
                 false,
                 false,
                 false
@@ -197,14 +210,6 @@ class KingShizukuInstaller {
         try {
             params.setPackageSource(packageSource);
         } catch (Throwable ignored) {
-        }
-    }
-
-    private int getShizukuUid() {
-        try {
-            return Shizuku.getUid();
-        } catch (Throwable ignored) {
-            return -1;
         }
     }
 
@@ -258,14 +263,38 @@ class KingShizukuInstaller {
             if (options.allowTestOnly) {
                 flags |= INSTALL_ALLOW_TEST;
             }
+            if (options.fromAdb || options.bypassPlayProtect) {
+                flags |= INSTALL_FROM_ADB;
+            }
+            if (options.installForAllUsers) {
+                flags |= INSTALL_ALL_USERS;
+            }
+            if (options.allowDowngrade) {
+                flags |= INSTALL_REQUEST_DOWNGRADE;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    flags |= INSTALL_ALLOW_DOWNGRADE;
+                }
+            }
             if (options.grantAllPermissions) {
                 flags |= INSTALL_GRANT_ALL_REQUESTED_PERMISSIONS;
+            }
+            if (options.enableRollback && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                flags |= INSTALL_ENABLE_ROLLBACK;
+            }
+            if (options.disableVerification || options.bypassPlayProtect) {
+                flags |= INSTALL_DISABLE_VERIFICATION;
+            }
+            if (options.allowRestrictedPermissions && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                flags |= INSTALL_ALL_WHITELIST_RESTRICTED_PERMISSIONS;
             }
             if (options.bypassLowTargetSdk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 flags |= INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK;
             }
             if (options.requestUpdateOwnership && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 flags |= INSTALL_REQUEST_UPDATE_OWNERSHIP;
+            }
+            if (options.privateSpaceInstall && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                flags |= INSTALL_FROM_MANAGED_USER_OR_PROFILE;
             }
             field.setInt(params, flags);
         } catch (Throwable ignored) {

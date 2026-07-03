@@ -33,7 +33,8 @@ public class ApkReceiverActivity extends Activity {
 
     private Uri extractApkUri(Intent intent) {
         if (intent == null) return null;
-        if (Intent.ACTION_VIEW.equals(intent.getAction())) {
+        if (Intent.ACTION_VIEW.equals(intent.getAction())
+                || Intent.ACTION_INSTALL_PACKAGE.equals(intent.getAction())) {
             return intent.getData();
         }
         if (Intent.ACTION_SEND.equals(intent.getAction())) {
