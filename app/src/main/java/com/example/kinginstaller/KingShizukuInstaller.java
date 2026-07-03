@@ -40,6 +40,10 @@ class KingShizukuInstaller {
     private static final String TAG = "KingShizukuInstaller";
     private static final String PLAY_STORE_PACKAGE = "com.android.vending";
     private static final int INSTALL_REPLACE_EXISTING = 0x00000002;
+    private static final int INSTALL_ALLOW_TEST = 0x00000004;
+    private static final int INSTALL_GRANT_ALL_REQUESTED_PERMISSIONS = 0x00000100;
+    private static final int INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK = 0x01000000;
+    private static final int INSTALL_REQUEST_UPDATE_OWNERSHIP = 1 << 25;
 
     private final Application app;
 
@@ -71,6 +75,11 @@ class KingShizukuInstaller {
 
     @SuppressLint("RequestInstallPackagesPolicy")
     InstallResult install(List<File> apkFiles, String expectedPackage) throws Exception {
+        return install(apkFiles, expectedPackage, defaultInstallOptions());
+    }
+
+    @SuppressLint("RequestInstallPackagesPolicy")
+    InstallResult install(List<File> apkFiles, String expectedPackage, InstallOptions options) throws Exception {
         if (apkFiles == null || apkFiles.isEmpty()) {
             throw new IOException("No APK files to install");
         }
@@ -82,7 +91,7 @@ class KingShizukuInstaller {
 
         PackageInstaller wrappedInstaller = createPackageInstaller(
                 packageInstaller,
-                PLAY_STORE_PACKAGE,
+                options.installerPackageName,
                 attributionTag,
                 userId
         );
@@ -93,13 +102,13 @@ class KingShizukuInstaller {
             params.setAppPackageName(expectedPackage);
         } catch (Throwable ignored) {
         }
-        params.setInstallReason(PackageManager.INSTALL_REASON_USER);
-        setSessionInstallerPackageName(params);
-        setSessionPackageSource(params);
-        if (Build.VERSION.SDK_INT >= 34) {
+        params.setInstallReason(options.installReason);
+        setSessionInstallerPackageName(params, options.installerPackageName);
+        setSessionPackageSource(params, options.packageSource);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && options.requestUpdateOwnership) {
             params.setRequestUpdateOwnership(true);
         }
-        applyReplaceExistingFlag(params);
+        applyInstallFlags(params, options);
 
         int sessionId = wrappedInstaller.createSession(params);
         IPackageInstallerSession sessionBinder = IPackageInstallerSession.Stub.asInterface(
@@ -143,6 +152,18 @@ class KingShizukuInstaller {
         }
     }
 
+    private static InstallOptions defaultInstallOptions() {
+        return new InstallOptions(
+                PLAY_STORE_PACKAGE,
+                PackageManager.INSTALL_REASON_USER,
+                PackageInstaller.PACKAGE_SOURCE_STORE,
+                true,
+                false,
+                false,
+                false
+        );
+    }
+
     private IPackageManager obtainPackageManager() throws IOException {
         IBinder binder = SystemServiceHelper.getSystemService("package");
         if (binder == null) {
@@ -160,16 +181,21 @@ class KingShizukuInstaller {
         }
     }
 
-    private static void setSessionInstallerPackageName(PackageInstaller.SessionParams params) {
+    private static void setSessionInstallerPackageName(
+            PackageInstaller.SessionParams params,
+            String installerPackageName
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return;
         try {
-            params.setInstallerPackageName(PLAY_STORE_PACKAGE);
+            params.setInstallerPackageName(installerPackageName);
         } catch (Throwable ignored) {
         }
     }
 
-    private static void setSessionPackageSource(PackageInstaller.SessionParams params) {
+    private static void setSessionPackageSource(PackageInstaller.SessionParams params, int packageSource) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
         try {
-            params.setPackageSource(PackageInstaller.PACKAGE_SOURCE_STORE);
+            params.setPackageSource(packageSource);
         } catch (Throwable ignored) {
         }
     }
@@ -224,11 +250,24 @@ class KingShizukuInstaller {
     }
 
     @SuppressLint("DiscouragedPrivateApi")
-    private static void applyReplaceExistingFlag(PackageInstaller.SessionParams params) {
+    private static void applyInstallFlags(PackageInstaller.SessionParams params, InstallOptions options) {
         try {
             Field field = PackageInstaller.SessionParams.class.getDeclaredField("installFlags");
             field.setAccessible(true);
-            field.setInt(params, field.getInt(params) | INSTALL_REPLACE_EXISTING);
+            int flags = field.getInt(params) | INSTALL_REPLACE_EXISTING;
+            if (options.allowTestOnly) {
+                flags |= INSTALL_ALLOW_TEST;
+            }
+            if (options.grantAllPermissions) {
+                flags |= INSTALL_GRANT_ALL_REQUESTED_PERMISSIONS;
+            }
+            if (options.bypassLowTargetSdk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                flags |= INSTALL_BYPASS_LOW_TARGET_SDK_BLOCK;
+            }
+            if (options.requestUpdateOwnership && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                flags |= INSTALL_REQUEST_UPDATE_OWNERSHIP;
+            }
+            field.setInt(params, flags);
         } catch (Throwable ignored) {
         }
     }

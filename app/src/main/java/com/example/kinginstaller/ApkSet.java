@@ -12,6 +12,9 @@ class ApkSet {
     private final String appName;
     private final String packageName;
     private final String versionName;
+    private final int minSdkVersion;
+    private final int targetSdkVersion;
+    private final long totalSizeBytes;
     private final String label;
 
     ApkSet(
@@ -21,6 +24,9 @@ class ApkSet {
             String appName,
             String packageName,
             String versionName,
+            int minSdkVersion,
+            int targetSdkVersion,
+            long totalSizeBytes,
             String label
     ) {
         this.sourceFile = sourceFile;
@@ -29,6 +35,9 @@ class ApkSet {
         this.appName = appName;
         this.packageName = packageName;
         this.versionName = versionName;
+        this.minSdkVersion = minSdkVersion;
+        this.targetSdkVersion = targetSdkVersion;
+        this.totalSizeBytes = totalSizeBytes;
         this.label = label;
     }
 
@@ -54,6 +63,18 @@ class ApkSet {
 
     String getVersionName() {
         return versionName;
+    }
+
+    int getMinSdkVersion() {
+        return minSdkVersion;
+    }
+
+    int getTargetSdkVersion() {
+        return targetSdkVersion;
+    }
+
+    long getTotalSizeBytes() {
+        return totalSizeBytes;
     }
 
     String getLabel() {

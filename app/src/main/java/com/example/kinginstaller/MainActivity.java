@@ -21,6 +21,7 @@ import android.util.TypedValue;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioGroup;
@@ -34,8 +35,10 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.FileProvider;
 
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.radiobutton.MaterialRadioButton;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -43,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -62,6 +66,13 @@ public class MainActivity extends AppCompatActivity {
     private static final String APK_MIME_TYPE = "application/vnd.android.package-archive";
     private static final String PREF_THEME_MODE = "theme_mode";
     private static final String PREF_INSTALL_ROUTE = "install_route";
+    private static final String PREF_INSTALLER_PACKAGE = "installer_package";
+    private static final String PREF_INSTALL_REASON = "install_reason";
+    private static final String PREF_PACKAGE_SOURCE = "package_source";
+    private static final String PREF_ALLOW_TEST_ONLY = "allow_test_only";
+    private static final String PREF_BYPASS_LOW_TARGET = "bypass_low_target";
+    private static final String PREF_GRANT_ALL_PERMISSIONS = "grant_all_permissions";
+    private static final String PREF_REQUEST_UPDATE_OWNERSHIP = "request_update_ownership";
     private static final String STATE_SELECTED_URI = "selected_uri";
     private static final long ROOT_COMMAND_TIMEOUT_MS = 1500;
     private static final int PACKAGE_VISIBILITY_CHECK_ATTEMPTS = 8;
@@ -69,11 +80,14 @@ public class MainActivity extends AppCompatActivity {
     private static final int THEME_AUTO = 0;
     private static final int THEME_LIGHT = 1;
     private static final int THEME_DARK = 2;
+    private static final int DEFAULT_INSTALL_REASON = PackageManager.INSTALL_REASON_USER;
+    private static final int DEFAULT_PACKAGE_SOURCE = PackageInstaller.PACKAGE_SOURCE_STORE;
     private static final int ROUTE_NORMAL_NO_ROOT = 0;
     private static final int ROUTE_NORMAL_SHIZUKU = 1;
     private static final int ROUTE_NORMAL_ROOT = 2;
     private static final int ROUTE_OEM_NO_ROOT = 3;
     private static final int ROUTE_OEM_ROOT = 4;
+    private static final int ROUTE_OEM_SHIZUKU = 5;
     private static final String[] ROOT_MANAGER_PACKAGES = {
             "com.topjohnwu.magisk",
             "io.github.huskydg.magisk",
@@ -127,12 +141,21 @@ public class MainActivity extends AppCompatActivity {
     private EditText pathEdit;
     private TextView statusText;
     private TextView apkInfoText;
-    private RadioGroup modeGroup;
-    private MaterialRadioButton normalNoRootMode;
-    private MaterialRadioButton normalShizukuMode;
-    private MaterialRadioButton normalRootMode;
-    private MaterialRadioButton oemNoRootMode;
-    private MaterialRadioButton oemRootMode;
+    private TextView deviceInfoText;
+    private EditText installerSourceEdit;
+    private MaterialAutoCompleteTextView installReasonDropdown;
+    private MaterialAutoCompleteTextView packageSourceDropdown;
+    private MaterialCheckBox allowTestOnlyCheck;
+    private MaterialCheckBox bypassLowTargetCheck;
+    private MaterialCheckBox grantAllPermissionsCheck;
+    private MaterialCheckBox requestUpdateOwnershipCheck;
+    private RadioGroup methodGroup;
+    private RadioGroup authorizerGroup;
+    private MaterialRadioButton methodNormalMode;
+    private MaterialRadioButton methodOemMode;
+    private MaterialRadioButton authorizerNoRootMode;
+    private MaterialRadioButton authorizerShizukuMode;
+    private MaterialRadioButton authorizerRootMode;
     private Button installButton;
     private Button openButton;
 
@@ -160,12 +183,13 @@ public class MainActivity extends AppCompatActivity {
             (requestCode, grantResult) -> {
                 if (requestCode != SHIZUKU_PERMISSION_REQUEST) return;
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    setInstallRoute(ROUTE_NORMAL_SHIZUKU);
+                    setInstallRoute(isOemRouteSelected() ? ROUTE_OEM_SHIZUKU : ROUTE_NORMAL_SHIZUKU);
                     setStatus(getString(R.string.shizuku_permission_requested));
                 } else {
-                    setInstallRoute(ROUTE_NORMAL_NO_ROOT);
+                    setInstallRoute(isOemRouteSelected() ? ROUTE_OEM_NO_ROOT : ROUTE_NORMAL_NO_ROOT);
                     setStatus(getString(R.string.shizuku_not_ready));
                 }
+                updateDeviceInfoStatus();
             };
 
     @Override
@@ -179,7 +203,9 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         initViews();
+        initAdvancedSettings();
         initShizuku();
+        updateDeviceInfoStatus();
         bindControls();
         restoreModeState();
         updateGooglePackageInstallerStatus();
@@ -255,12 +281,21 @@ public class MainActivity extends AppCompatActivity {
         pathEdit = findViewById(R.id.pathTextEdit);
         statusText = findViewById(R.id.textViewError);
         apkInfoText = findViewById(R.id.textViewApkInfo);
-        modeGroup = findViewById(R.id.modeGroup);
-        normalNoRootMode = findViewById(R.id.radioNormalNoRoot);
-        normalShizukuMode = findViewById(R.id.radioNormalShizuku);
-        normalRootMode = findViewById(R.id.radioNormalRoot);
-        oemNoRootMode = findViewById(R.id.radioOemNoRoot);
-        oemRootMode = findViewById(R.id.radioOemRoot);
+        deviceInfoText = findViewById(R.id.deviceInfoText);
+        installerSourceEdit = findViewById(R.id.installerSourceEdit);
+        installReasonDropdown = findViewById(R.id.installReasonDropdown);
+        packageSourceDropdown = findViewById(R.id.packageSourceDropdown);
+        allowTestOnlyCheck = findViewById(R.id.allowTestOnlyCheck);
+        bypassLowTargetCheck = findViewById(R.id.bypassLowTargetCheck);
+        grantAllPermissionsCheck = findViewById(R.id.grantAllPermissionsCheck);
+        requestUpdateOwnershipCheck = findViewById(R.id.requestUpdateOwnershipCheck);
+        methodGroup = findViewById(R.id.methodGroup);
+        authorizerGroup = findViewById(R.id.authorizerGroup);
+        methodNormalMode = findViewById(R.id.radioMethodNormal);
+        methodOemMode = findViewById(R.id.radioMethodOem);
+        authorizerNoRootMode = findViewById(R.id.radioAuthNoRoot);
+        authorizerShizukuMode = findViewById(R.id.radioAuthShizuku);
+        authorizerRootMode = findViewById(R.id.radioAuthRoot);
         installButton = findViewById(R.id.installButton);
         openButton = findViewById(R.id.openButton);
         updateOpenButton(false);
@@ -279,14 +314,135 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void initAdvancedSettings() {
+        SharedPreferences prefs = getPreferences(Activity.MODE_PRIVATE);
+        String[] reasonLabels = installReasonLabels();
+        String[] sourceLabels = packageSourceLabels();
+
+        installReasonDropdown.setAdapter(new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_list_item_1,
+                reasonLabels
+        ));
+        packageSourceDropdown.setAdapter(new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_list_item_1,
+                sourceLabels
+        ));
+
+        installerSourceEdit.setText(prefs.getString(PREF_INSTALLER_PACKAGE, PLAY_STORE_PACKAGE));
+        setDropdownSelection(
+                installReasonDropdown,
+                reasonLabels,
+                prefs.getInt(PREF_INSTALL_REASON, DEFAULT_INSTALL_REASON)
+        );
+        setDropdownSelection(
+                packageSourceDropdown,
+                sourceLabels,
+                prefs.getInt(PREF_PACKAGE_SOURCE, DEFAULT_PACKAGE_SOURCE)
+        );
+        allowTestOnlyCheck.setChecked(prefs.getBoolean(PREF_ALLOW_TEST_ONLY, true));
+        bypassLowTargetCheck.setChecked(prefs.getBoolean(PREF_BYPASS_LOW_TARGET, false));
+        grantAllPermissionsCheck.setChecked(prefs.getBoolean(PREF_GRANT_ALL_PERMISSIONS, false));
+        requestUpdateOwnershipCheck.setChecked(prefs.getBoolean(PREF_REQUEST_UPDATE_OWNERSHIP, false));
+
+        installerSourceEdit.setOnFocusChangeListener((view, hasFocus) -> {
+            if (!hasFocus) saveAdvancedSettings();
+        });
+        installReasonDropdown.setOnItemClickListener((parent, view, position, id) -> saveAdvancedSettings());
+        packageSourceDropdown.setOnItemClickListener((parent, view, position, id) -> saveAdvancedSettings());
+        allowTestOnlyCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        bypassLowTargetCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        grantAllPermissionsCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+        requestUpdateOwnershipCheck.setOnCheckedChangeListener((buttonView, isChecked) -> saveAdvancedSettings());
+    }
+
+    private String[] installReasonLabels() {
+        return new String[]{
+                getString(R.string.install_reason_unknown),
+                getString(R.string.install_reason_policy),
+                getString(R.string.install_reason_restore),
+                getString(R.string.install_reason_setup),
+                getString(R.string.install_reason_user)
+        };
+    }
+
+    private String[] packageSourceLabels() {
+        return new String[]{
+                getString(R.string.package_source_unspecified),
+                getString(R.string.package_source_other),
+                getString(R.string.package_source_store),
+                getString(R.string.package_source_local),
+                getString(R.string.package_source_downloaded)
+        };
+    }
+
+    private void setDropdownSelection(MaterialAutoCompleteTextView view, String[] labels, int index) {
+        int safeIndex = index >= 0 && index < labels.length ? index : 0;
+        view.setText(labels[safeIndex], false);
+    }
+
+    private int selectedDropdownIndex(MaterialAutoCompleteTextView view, String[] labels, int fallback) {
+        String value = view.getText() == null ? "" : view.getText().toString();
+        for (int index = 0; index < labels.length; index++) {
+            if (labels[index].equals(value)) return index;
+        }
+        return fallback;
+    }
+
+    private void saveAdvancedSettings() {
+        getPreferences(Activity.MODE_PRIVATE).edit()
+                .putString(PREF_INSTALLER_PACKAGE, getConfiguredInstallerPackageName())
+                .putInt(PREF_INSTALL_REASON, selectedInstallReason())
+                .putInt(PREF_PACKAGE_SOURCE, selectedPackageSource())
+                .putBoolean(PREF_ALLOW_TEST_ONLY, allowTestOnlyCheck.isChecked())
+                .putBoolean(PREF_BYPASS_LOW_TARGET, bypassLowTargetCheck.isChecked())
+                .putBoolean(PREF_GRANT_ALL_PERMISSIONS, grantAllPermissionsCheck.isChecked())
+                .putBoolean(PREF_REQUEST_UPDATE_OWNERSHIP, requestUpdateOwnershipCheck.isChecked())
+                .apply();
+    }
+
+    private InstallOptions createInstallOptions() {
+        saveAdvancedSettings();
+        return new InstallOptions(
+                getConfiguredInstallerPackageName(),
+                selectedInstallReason(),
+                selectedPackageSource(),
+                allowTestOnlyCheck.isChecked(),
+                bypassLowTargetCheck.isChecked(),
+                grantAllPermissionsCheck.isChecked(),
+                requestUpdateOwnershipCheck.isChecked()
+        );
+    }
+
+    private String getConfiguredInstallerPackageName() {
+        String value = installerSourceEdit.getText() == null
+                ? ""
+                : installerSourceEdit.getText().toString().trim();
+        return value.isEmpty() ? PLAY_STORE_PACKAGE : value;
+    }
+
+    private int selectedInstallReason() {
+        return selectedDropdownIndex(installReasonDropdown, installReasonLabels(), DEFAULT_INSTALL_REASON);
+    }
+
+    private int selectedPackageSource() {
+        return selectedDropdownIndex(packageSourceDropdown, packageSourceLabels(), DEFAULT_PACKAGE_SOURCE);
+    }
+
     private void bindControls() {
         findViewById(R.id.selectButton).setOnClickListener(v -> showFileChooser());
 
         findViewById(R.id.site_annexhack).setOnClickListener(v -> openUrl("https://inceptive.ru"));
 
-        modeGroup.setOnCheckedChangeListener((group, checkedId) -> {
+        methodGroup.setOnCheckedChangeListener((group, checkedId) -> {
             if (updatingMode) return;
-            handleRouteSelection(routeFromCheckedId(checkedId));
+            handleRouteSelection(routeFromCurrentSelection());
+        });
+
+        authorizerGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (updatingMode) return;
+            handleRouteSelection(routeFromCurrentSelection());
         });
 
         installButton.setOnClickListener(v -> {
@@ -310,8 +466,8 @@ public class MainActivity extends AppCompatActivity {
         int route = prefs.contains(PREF_INSTALL_ROUTE)
                 ? prefs.getInt(PREF_INSTALL_ROUTE, ROUTE_NORMAL_NO_ROOT)
                 : legacyRouteFromPrefs(prefs);
-        if (route == ROUTE_NORMAL_SHIZUKU && !ensureShizukuReady(false)) {
-            route = ROUTE_NORMAL_NO_ROOT;
+        if (isShizukuRoute(route) && !ensureShizukuReady(false)) {
+            route = fallbackRouteFor(route);
         }
         if (isRootRoute(route) && !isDeviceRooted()) {
             route = fallbackRouteFor(route);
@@ -332,7 +488,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleRouteSelection(int route) {
-        if (route == ROUTE_NORMAL_SHIZUKU && !ensureShizukuReady(true)) {
+        if (isShizukuRoute(route) && !ensureShizukuReady(true)) {
             setInstallRoute(selectedInstallRoute);
             return;
         }
@@ -356,11 +512,11 @@ public class MainActivity extends AppCompatActivity {
     private void setInstallRoute(int route) {
         selectedInstallRoute = normalizeInstallRoute(route);
         updatingMode = true;
-        normalNoRootMode.setChecked(selectedInstallRoute == ROUTE_NORMAL_NO_ROOT);
-        normalShizukuMode.setChecked(selectedInstallRoute == ROUTE_NORMAL_SHIZUKU);
-        normalRootMode.setChecked(selectedInstallRoute == ROUTE_NORMAL_ROOT);
-        oemNoRootMode.setChecked(selectedInstallRoute == ROUTE_OEM_NO_ROOT);
-        oemRootMode.setChecked(selectedInstallRoute == ROUTE_OEM_ROOT);
+        methodNormalMode.setChecked(!isOemRoute(selectedInstallRoute));
+        methodOemMode.setChecked(isOemRoute(selectedInstallRoute));
+        authorizerNoRootMode.setChecked(isNoRootRoute(selectedInstallRoute));
+        authorizerShizukuMode.setChecked(isShizukuRoute(selectedInstallRoute));
+        authorizerRootMode.setChecked(isRootRoute(selectedInstallRoute));
         updatingMode = false;
         updateOemAliasState();
         saveModeState();
@@ -372,6 +528,8 @@ public class MainActivity extends AppCompatActivity {
         if (installButton == null) return;
         if (selectedInstallRoute == ROUTE_OEM_ROOT) {
             installButton.setText(R.string.install_with_oem_root);
+        } else if (selectedInstallRoute == ROUTE_OEM_SHIZUKU) {
+            installButton.setText(R.string.install_with_oem_shizuku);
         } else if (selectedInstallRoute == ROUTE_NORMAL_ROOT) {
             installButton.setText(R.string.install_with_root);
         } else if (selectedInstallRoute == ROUTE_NORMAL_SHIZUKU) {
@@ -392,27 +550,43 @@ public class MainActivity extends AppCompatActivity {
                 .apply();
     }
 
-    private int routeFromCheckedId(int checkedId) {
-        if (checkedId == R.id.radioNormalShizuku) return ROUTE_NORMAL_SHIZUKU;
-        if (checkedId == R.id.radioNormalRoot) return ROUTE_NORMAL_ROOT;
-        if (checkedId == R.id.radioOemNoRoot) return ROUTE_OEM_NO_ROOT;
-        if (checkedId == R.id.radioOemRoot) return ROUTE_OEM_ROOT;
+    private int routeFromCurrentSelection() {
+        boolean oem = methodOemMode != null && methodOemMode.isChecked();
+        boolean shizuku = authorizerShizukuMode != null && authorizerShizukuMode.isChecked();
+        boolean root = authorizerRootMode != null && authorizerRootMode.isChecked();
+        if (oem && root) return ROUTE_OEM_ROOT;
+        if (oem && shizuku) return ROUTE_OEM_SHIZUKU;
+        if (oem) return ROUTE_OEM_NO_ROOT;
+        if (root) return ROUTE_NORMAL_ROOT;
+        if (shizuku) return ROUTE_NORMAL_SHIZUKU;
         return ROUTE_NORMAL_NO_ROOT;
     }
 
     private int normalizeInstallRoute(int route) {
-        if (route >= ROUTE_NORMAL_NO_ROOT && route <= ROUTE_OEM_ROOT) {
+        if (route >= ROUTE_NORMAL_NO_ROOT && route <= ROUTE_OEM_SHIZUKU) {
             return route;
         }
         return ROUTE_NORMAL_NO_ROOT;
     }
 
     private int fallbackRouteFor(int route) {
-        return route == ROUTE_OEM_ROOT ? ROUTE_OEM_NO_ROOT : ROUTE_NORMAL_NO_ROOT;
+        return isOemRoute(route) ? ROUTE_OEM_NO_ROOT : ROUTE_NORMAL_NO_ROOT;
+    }
+
+    private boolean isNoRootRoute(int route) {
+        return route == ROUTE_NORMAL_NO_ROOT || route == ROUTE_OEM_NO_ROOT;
     }
 
     private boolean isRootRoute(int route) {
         return route == ROUTE_NORMAL_ROOT || route == ROUTE_OEM_ROOT;
+    }
+
+    private boolean isShizukuRoute(int route) {
+        return route == ROUTE_NORMAL_SHIZUKU || route == ROUTE_OEM_SHIZUKU;
+    }
+
+    private boolean isOemRoute(int route) {
+        return route == ROUTE_OEM_NO_ROOT || route == ROUTE_OEM_SHIZUKU || route == ROUTE_OEM_ROOT;
     }
 
     private boolean isRootRouteSelected() {
@@ -420,11 +594,39 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean isShizukuRouteSelected() {
-        return selectedInstallRoute == ROUTE_NORMAL_SHIZUKU;
+        return isShizukuRoute(selectedInstallRoute);
     }
 
     private boolean isOemRouteSelected() {
-        return selectedInstallRoute == ROUTE_OEM_NO_ROOT || selectedInstallRoute == ROUTE_OEM_ROOT;
+        return isOemRoute(selectedInstallRoute);
+    }
+
+    private void updateDeviceInfoStatus() {
+        if (deviceInfoText == null) return;
+        deviceInfoText.setText(getString(
+                R.string.device_info_status,
+                capitalize(Build.MANUFACTURER),
+                Build.MODEL,
+                Build.VERSION.RELEASE,
+                Build.VERSION.SDK_INT,
+                getString(isDeviceRooted() ? R.string.status_yes : R.string.status_no),
+                getString(isShizukuAuthorized() ? R.string.status_ready : R.string.status_not_ready)
+        ));
+    }
+
+    private boolean isShizukuAuthorized() {
+        try {
+            return !Shizuku.isPreV11()
+                    && Shizuku.pingBinder()
+                    && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String capitalize(String value) {
+        if (value == null || value.isEmpty()) return "";
+        return value.substring(0, 1).toUpperCase(Locale.US) + value.substring(1);
     }
 
     private void updateGooglePackageInstallerStatus() {
@@ -540,11 +742,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void installAsRoot() {
+        InstallOptions options = createInstallOptions();
         markInstallVerificationPending();
         setInstallButtonsEnabled(false);
         new Thread(() -> {
             try {
-                StreamLogs logs = runSuWithCmd(buildRootInstallCommand());
+                StreamLogs logs = runSuWithCmd(buildRootInstallCommand(options));
                 runOnUiThread(() -> {
                     setInstallButtonsEnabled(true);
                     if (!logs.getErrorStreamLog().isEmpty()) {
@@ -565,35 +768,56 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    private String buildRootInstallCommand() {
+    private String buildRootInstallCommand(InstallOptions options) {
         StringBuilder command = new StringBuilder();
         if (selectedApkSet.isSingleApk()) {
-            command.append("pm install -t -i ")
-                    .append(shellQuote(PLAY_STORE_PACKAGE))
-                    .append(" -r ")
+            command.append("pm install");
+            appendRootInstallOptions(command, options);
+            command.append(" -r ")
                     .append(shellQuote(selectedApkSet.getApkFiles().get(0).getAbsolutePath()));
         } else {
-            command.append("pm install-multiple -t -i ")
-                    .append(shellQuote(PLAY_STORE_PACKAGE))
-                    .append(" -r");
+            command.append("pm install-multiple");
+            appendRootInstallOptions(command, options);
+            command.append(" -r");
             for (File apkFile : selectedApkSet.getApkFiles()) {
                 command.append(' ').append(shellQuote(apkFile.getAbsolutePath()));
             }
         }
         return command.append(" && ")
-                .append(buildSetInstallerCommand(selectedPackageName))
+                .append(buildSetInstallerCommand(selectedPackageName, options.installerPackageName))
                 .toString();
     }
 
-    private String buildSetInstallerCommand(String packageName) {
+    private void appendRootInstallOptions(StringBuilder command, InstallOptions options) {
+        if (options.allowTestOnly) {
+            command.append(" -t");
+        }
+        command.append(" -i ").append(shellQuote(options.installerPackageName));
+        if (options.grantAllPermissions) {
+            command.append(" -g");
+        }
+        if (options.bypassLowTargetSdk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            command.append(" --bypass-low-target-sdk-block");
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            command.append(" --package-source ").append(options.packageSource);
+        }
+        if (options.requestUpdateOwnership && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            command.append(" --update-ownership");
+        }
+        command.append(" --install-reason ").append(options.installReason);
+    }
+
+    private String buildSetInstallerCommand(String packageName, String installerPackageName) {
         return "(cmd package set-installer " + shellQuote(packageName) + " " +
-                shellQuote(PLAY_STORE_PACKAGE) + " 2>&1 || " +
+                shellQuote(installerPackageName) + " 2>&1 || " +
                 "pm set-installer " + shellQuote(packageName) + " " +
-                shellQuote(PLAY_STORE_PACKAGE) + " 2>&1 || true)";
+                shellQuote(installerPackageName) + " 2>&1 || true)";
     }
 
     private void installAsShizuku() {
         if (!ensureShizukuReady(true)) return;
+        InstallOptions options = createInstallOptions();
         markInstallVerificationPending();
         setInstallButtonsEnabled(false);
         new Thread(() -> {
@@ -601,7 +825,7 @@ public class MainActivity extends AppCompatActivity {
                 if (shizukuInstaller == null) {
                     shizukuInstaller = new KingShizukuInstaller(getApplication());
                 }
-                shizukuInstaller.install(selectedApkSet.getApkFiles(), selectedPackageName);
+                shizukuInstaller.install(selectedApkSet.getApkFiles(), selectedPackageName, options);
                 runOnUiThread(() -> {
                     setInstallButtonsEnabled(true);
                     Toast.makeText(this, R.string.shizuku_install_success, Toast.LENGTH_SHORT).show();
@@ -618,8 +842,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void installAsKing() {
+        InstallOptions options = createInstallOptions();
         if (!selectedApkSet.isSingleApk()) {
-            installSplitSessionWithUserAction();
+            installSplitSessionWithUserAction(options);
             return;
         }
         try {
@@ -633,7 +858,7 @@ public class MainActivity extends AppCompatActivity {
             intent.setDataAndType(fileUri, APK_MIME_TYPE);
             intent.setClipData(ClipData.newRawUri("apk", fileUri));
             intent.putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true);
-            intent.putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, PLAY_STORE_PACKAGE);
+            intent.putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, options.installerPackageName);
             grantReadPermissionToInstallers(intent, fileUri);
             setStatus(getString(R.string.install_started_no_root));
             markInstallVerificationPending();
@@ -651,7 +876,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void installSplitSessionWithUserAction() {
+    private void installSplitSessionWithUserAction(InstallOptions options) {
         markInstallVerificationPending();
         setInstallButtonsEnabled(false);
         new Thread(() -> {
@@ -666,7 +891,7 @@ public class MainActivity extends AppCompatActivity {
                     params.setAppPackageName(selectedPackageName);
                 } catch (Throwable ignored) {
                 }
-                params.setInstallReason(PackageManager.INSTALL_REASON_USER);
+                applySessionOptions(params, options);
 
                 sessionId = packageInstaller.createSession(params);
                 session = packageInstaller.openSession(sessionId);
@@ -737,6 +962,31 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
         setStatus(getString(R.string.split_install_started));
+    }
+
+    private void applySessionOptions(PackageInstaller.SessionParams params, InstallOptions options) {
+        try {
+            params.setInstallReason(options.installReason);
+        } catch (Throwable ignored) {
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                params.setPackageSource(options.packageSource);
+            } catch (Throwable ignored) {
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            try {
+                params.setInstallerPackageName(options.installerPackageName);
+            } catch (Throwable ignored) {
+            }
+            if (options.requestUpdateOwnership) {
+                try {
+                    params.setRequestUpdateOwnership(true);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
     }
 
     private void grantReadPermissionToInstallers(Intent intent, Uri apkUri) {
@@ -838,10 +1088,31 @@ public class MainActivity extends AppCompatActivity {
         String version = selectedApkSet.getVersionName() == null
                 ? getString(R.string.install_source_unknown)
                 : selectedApkSet.getVersionName();
+        String minSdk = sdkLabel(selectedApkSet.getMinSdkVersion());
+        String targetSdk = sdkLabel(selectedApkSet.getTargetSdkVersion());
+        String size = formatBytes(selectedApkSet.getTotalSizeBytes());
         int apkCount = selectedApkSet.getApkCount();
         apkInfoText.setText(apkCount > 1
-                ? getString(R.string.apk_info_bundle, appName, selectedPackageName, version, apkCount)
-                : getString(R.string.apk_info_single, appName, selectedPackageName, version));
+                ? getString(R.string.apk_info_bundle, appName, selectedPackageName, version, minSdk, targetSdk, size, apkCount)
+                : getString(R.string.apk_info_single, appName, selectedPackageName, version, minSdk, targetSdk, size));
+    }
+
+    private String sdkLabel(int sdk) {
+        return sdk > 0 ? String.valueOf(sdk) : getString(R.string.install_source_unknown);
+    }
+
+    private String formatBytes(long bytes) {
+        if (bytes <= 0) return getString(R.string.install_source_unknown);
+        final long unit = 1024;
+        if (bytes < unit) return bytes + " B";
+        double value = bytes;
+        String[] units = {"KB", "MB", "GB"};
+        int unitIndex = -1;
+        do {
+            value /= unit;
+            unitIndex++;
+        } while (value >= unit && unitIndex < units.length - 1);
+        return String.format(Locale.US, value >= 10 ? "%.0f %s" : "%.1f %s", value, units[unitIndex]);
     }
 
     private void persistSelectedUriPermission(Uri uri) {

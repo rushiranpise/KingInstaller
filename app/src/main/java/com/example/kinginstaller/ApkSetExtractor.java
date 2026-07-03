@@ -72,6 +72,9 @@ final class ApkSetExtractor {
                     details.appName,
                     details.packageName,
                     details.versionName,
+                    details.minSdkVersion,
+                    details.targetSdkVersion,
+                    totalSize(apkFiles),
                     safeName
             );
         } catch (IOException | RuntimeException error) {
@@ -139,6 +142,8 @@ final class ApkSetExtractor {
         String packageName = null;
         String versionName = null;
         String appName = null;
+        int minSdkVersion = 0;
+        int targetSdkVersion = 0;
         for (File apkFile : apkFiles) {
             if (!isApkArchive(apkFile)) {
                 throw new IOException("Invalid APK inside bundle: " + apkFile.getName());
@@ -150,6 +155,10 @@ final class ApkSetExtractor {
             if (packageName == null) {
                 packageName = info.packageName;
                 appName = readApplicationLabel(context, info, apkFile);
+                if (info.applicationInfo != null) {
+                    minSdkVersion = info.applicationInfo.minSdkVersion;
+                    targetSdkVersion = info.applicationInfo.targetSdkVersion;
+                }
             } else if (!packageName.equals(info.packageName)) {
                 throw new IOException("Bundle contains APKs for multiple packages");
             }
@@ -160,7 +169,7 @@ final class ApkSetExtractor {
         if (packageName == null) {
             throw new IOException("Bundle does not contain a valid base APK");
         }
-        return new PackageDetails(appName, packageName, versionName);
+        return new PackageDetails(appName, packageName, versionName, minSdkVersion, targetSdkVersion);
     }
 
     private static String readApplicationLabel(Context context, PackageInfo info, File apkFile) {
@@ -235,6 +244,14 @@ final class ApkSetExtractor {
         if ("base.apk".equals(name) || name.startsWith("base.")) return 0;
         if (name.contains("base")) return 1;
         return 2;
+    }
+
+    private static long totalSize(List<File> files) {
+        long total = 0;
+        for (File file : files) {
+            total += Math.max(0, file.length());
+        }
+        return total;
     }
 
     private static String queryDisplayName(Context context, Uri uri) {
@@ -325,11 +342,21 @@ final class ApkSetExtractor {
         final String appName;
         final String packageName;
         final String versionName;
+        final int minSdkVersion;
+        final int targetSdkVersion;
 
-        PackageDetails(String appName, String packageName, String versionName) {
+        PackageDetails(
+                String appName,
+                String packageName,
+                String versionName,
+                int minSdkVersion,
+                int targetSdkVersion
+        ) {
             this.appName = appName;
             this.packageName = packageName;
             this.versionName = versionName;
+            this.minSdkVersion = minSdkVersion;
+            this.targetSdkVersion = targetSdkVersion;
         }
     }
 }

@@ -1,15 +1,23 @@
-name: Android CI
+name: Android Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag. Leave blank to use v<versionName>."
+        required: false
+        type: string
+      prerelease:
+        description: "Mark this GitHub release as a pre-release."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -48,19 +56,26 @@ jobs:
 
       - name: Read app version
         id: version
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         shell: bash
         run: |
           version_name=$(awk -F'"' '/versionName/ { print $2; exit }' app/build.gradle)
           version_code=$(awk '/versionCode/ { print $2; exit }' app/build.gradle)
+          release_tag="$INPUT_RELEASE_TAG"
 
           if [ -z "$version_name" ] || [ -z "$version_code" ]; then
             echo "Could not read versionName/versionCode from app/build.gradle" >&2
             exit 1
           fi
 
+          if [ -z "$release_tag" ]; then
+            release_tag="v$version_name"
+          fi
+
           echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
           echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
-          echo "release_tag=v$version_name" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
       - name: Build debug and release APKs
         run: ./gradlew --no-daemon clean :app:assembleDebug :app:assembleRelease
@@ -86,7 +101,6 @@ jobs:
     name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
 
     permissions:
       contents: write
@@ -94,8 +108,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Download APK artifacts
         uses: actions/download-artifact@v4
@@ -103,36 +115,25 @@ jobs:
           name: KingInstaller-${{ needs.build.outputs.version_name }}-${{ needs.build.outputs.version_code }}-apks
           path: artifacts
 
-      - name: Resolve release tag
-        id: release_tag
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            tag="${GITHUB_REF_NAME}"
-          else
-            tag="${{ needs.build.outputs.release_tag }}"
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git fetch --tags
-            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-              git tag "$tag"
-              git push origin "$tag"
-            fi
-          fi
-
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
       - name: Create or update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release_tag.outputs.tag }}
+          TAG: ${{ needs.build.outputs.release_tag }}
           VERSION_NAME: ${{ needs.build.outputs.version_name }}
+          IS_PRERELEASE: ${{ inputs.prerelease }}
         shell: bash
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" artifacts/* --clobber
           else
+            prerelease_args=()
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              prerelease_args+=(--prerelease)
+            fi
+
             gh release create "$TAG" artifacts/* \
               --title "KingInstaller $VERSION_NAME" \
+              --target "$GITHUB_SHA" \
+              "${prerelease_args[@]}" \
               --generate-notes
           fi

@@ -60,6 +60,15 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorOnSurfaceVariant" />
 
+            <TextView
+                android:id="@+id/deviceInfoText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                tools:text="Device: Google Pixel 8 • Android 15 / SDK 35 • Root: no • Shizuku: ready" />
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -147,32 +156,153 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:text="@string/section_advanced"
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/advanced_description"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:hint="@string/install_source_package"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusTopStart="8dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/installerSourceEdit"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text"
+                            android:maxLines="1" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="@string/install_reason"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusTopStart="8dp">
+
+                        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                            android:id="@+id/installReasonDropdown"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="@string/package_source"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusTopStart="8dp">
+
+                        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                            android:id="@+id/packageSourceDropdown"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/allowTestOnlyCheck"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:minHeight="44dp"
+                        android:text="@string/allow_test_apks"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/bypassLowTargetCheck"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="44dp"
+                        android:text="@string/bypass_low_target_sdk"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/grantAllPermissionsCheck"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="44dp"
+                        android:text="@string/grant_all_permissions"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <com.google.android.material.checkbox.MaterialCheckBox
+                        android:id="@+id/requestUpdateOwnershipCheck"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="44dp"
+                        android:text="@string/request_update_ownership"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerLow"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:contentPadding="16dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:text="@string/section_mode"
                         android:textAppearance="?attr/textAppearanceTitleMedium"
                         android:textColor="?attr/colorOnSurface" />
 
-                    <RadioGroup
-                        android:id="@+id/modeGroup"
+                    <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:checkedButton="@id/radioNormalNoRoot"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/method_header"
+                        android:textAppearance="?attr/textAppearanceLabelLarge"
+                        android:textColor="?attr/colorPrimary" />
+
+                    <RadioGroup
+                        android:id="@+id/methodGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:checkedButton="@id/radioMethodNormal"
                         android:orientation="vertical">
 
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="@string/method_normal_header"
-                            android:textAppearance="?attr/textAppearanceLabelLarge"
-                            android:textColor="?attr/colorPrimary" />
-
                         <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/radioNormalNoRoot"
+                            android:id="@+id/radioMethodNormal"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:minHeight="44dp"
-                            android:text="@string/mode_normal_no_root_title"
+                            android:text="@string/method_normal_title"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                         <TextView
@@ -181,16 +311,50 @@
                             android:layout_marginStart="48dp"
                             android:layout_marginTop="-4dp"
                             android:layout_marginBottom="6dp"
-                            android:text="@string/mode_normal_no_root_description"
+                            android:text="@string/method_normal_description"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
                         <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/radioNormalShizuku"
+                            android:id="@+id/radioMethodOem"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:minHeight="44dp"
-                            android:text="@string/mode_normal_shizuku_title"
+                            android:text="@string/method_oem_title"
+                            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="48dp"
+                            android:layout_marginTop="-4dp"
+                            android:text="@string/method_oem_description"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/authorizer_header"
+                        android:textAppearance="?attr/textAppearanceLabelLarge"
+                        android:textColor="?attr/colorPrimary" />
+
+                    <RadioGroup
+                        android:id="@+id/authorizerGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:checkedButton="@id/radioAuthNoRoot"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.radiobutton.MaterialRadioButton
+                            android:id="@+id/radioAuthNoRoot"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:minHeight="44dp"
+                            android:text="@string/auth_no_root_title"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                         <TextView
@@ -199,16 +363,16 @@
                             android:layout_marginStart="48dp"
                             android:layout_marginTop="-4dp"
                             android:layout_marginBottom="6dp"
-                            android:text="@string/mode_normal_shizuku_description"
+                            android:text="@string/auth_no_root_description"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
                         <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/radioNormalRoot"
+                            android:id="@+id/radioAuthShizuku"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:minHeight="44dp"
-                            android:text="@string/mode_normal_root_title"
+                            android:text="@string/auth_shizuku_title"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                         <TextView
@@ -217,24 +381,16 @@
                             android:layout_marginStart="48dp"
                             android:layout_marginTop="-4dp"
                             android:layout_marginBottom="6dp"
-                            android:text="@string/mode_normal_root_description"
+                            android:text="@string/auth_shizuku_description"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:text="@string/method_oem_header"
-                            android:textAppearance="?attr/textAppearanceLabelLarge"
-                            android:textColor="?attr/colorPrimary" />
-
                         <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/radioOemNoRoot"
+                            android:id="@+id/radioAuthRoot"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:minHeight="44dp"
-                            android:text="@string/mode_oem_no_root_title"
+                            android:text="@string/auth_root_title"
                             android:textAppearance="?attr/textAppearanceBodyLarge" />
 
                         <TextView
@@ -242,25 +398,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="48dp"
                             android:layout_marginTop="-4dp"
-                            android:layout_marginBottom="6dp"
-                            android:text="@string/mode_oem_no_root_description"
-                            android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:textColor="?attr/colorOnSurfaceVariant" />
-
-                        <com.google.android.material.radiobutton.MaterialRadioButton
-                            android:id="@+id/radioOemRoot"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:minHeight="44dp"
-                            android:text="@string/mode_oem_root_title"
-                            android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="48dp"
-                            android:layout_marginTop="-4dp"
-                            android:text="@string/mode_oem_root_description"
+                            android:text="@string/auth_root_description"
                             android:textAppearance="?attr/textAppearanceBodySmall"
                             android:textColor="?attr/colorOnSurfaceVariant" />
                     </RadioGroup>
